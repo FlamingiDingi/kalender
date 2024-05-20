@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<style>
+  .calendar-container, .current-date, .date-selector {
+    max-width: 400px;
+    margin: 20px auto;
+    text-align: center;
+    font-family: Verdana, sans-serif;
+  }
+  .calendar-container {
+    background-color: black;
+    color: white;
+    padding: 20px;
+    position: relative;
+    border-radius: 5px;
+  }
+  .current-date {
+    background-color: black;
+    color: white;
+    padding: 10px;
+    cursor: pointer;
+    border: 3px solid green;
+    border-radius: 5px;
+  }
+  .day {
+    padding: 5px;
+    cursor: pointer;
+    border-radius: 5px;
+    color: white;
+    text-align: center;
+    position: relative;
+  }
+  .day:hover, .selected-day:hover {
+    background-color: white;
+    color: black;
+    border: 2px solid orange;
+  }
+  .selected-day {
+    background-color: white;
+    color: black;
+    border: 2px solid green;
+    border-radius: 5px;
+  }
+  .selected-day-clicked {
+    background-color: white;
+    color: black; /* Upewnij się, że kolor tekstu jest widoczny na tle */
+    border: 2px solid orange;
+    border-radius: 5px;
+    z-index: 1; /* Zapewnij, że element będzie na wierzchu */
+  }
+  .today {
+    background-color: black;
+    color: white;
+    border: 2px solid green;
+    border-radius: 5px;
+  }
+  .holiday {
+    border: 2px solid red;
+    border-radius: 5px;
+    position: relative;
+    background-color: transparent;
+  }
+  .holiday .tooltip {
+    background-color: red;
+    border: 1px solid white;
+  }
+  .holiday .tooltip-content {
+    color: white;
+  }
+  .holiday:hover .tooltip {
+    display: block;
+  }
+  .ferie, .special-date, .special-event {
+    border: 2px solid blue;
+    border-radius: 5px;
+    position: relative;
+    background-color: transparent;
+  }
+  .special-day {
+    border: 2px solid white;
+    border-radius: 5px;
+    background-color: rgba(255, 255, 255, 0.2);
+    position: relative;
+  }
+  .ferie .tooltip, .special-date .tooltip, .special-event .tooltip, .special-day .tooltip {
+    background-color: blue;
+    border: 1px solid white;
+  }
+  .ferie .tooltip-content, .special-date .tooltip-content, .special-event .tooltip-content, .special-day .tooltip-content {
+    color: lightgray;
+  }
+  .ferie:hover .tooltip, .special-date:hover .tooltip, .special-event:hover .tooltip, .special-day:hover .tooltip {
+    display: block;
+  }
+  .tooltip {
+    display: none;
+    position: absolute;
+    bottom: 120%;
+    left: 50%;
+    transform: translateX(-50%);
+    color: white;
+    padding: 5px;
+    border: 1px solid white;
+    border-radius: 3px;
+    white-space: nowrap;
+    z-index: 10;
+  }
+  .tooltip-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .tooltip-content .date {
+    font-weight: bold;
+  }
+  .tooltip-content .name {
+    margin-top: 5px;
+  }
+  .date-selector {
+    color: white;
+    background-color: black;
+    padding: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 25px;
+    border-radius: 5px;
+  }
+  .arrow {
+    cursor: pointer;
+    user-select: none;
+    font-size: 24px;
+    color: white;
+    margin: 0 10px;
+  }
+  select {
+    background-color: black;
+    color: white;
+    border: 2px solid white;
+    font-size: 20px;
+    padding: 5px;
+    margin: 0 5px;
+    text-align: center;
+    border-radius: 5px;
+  }
+  select:hover, select:focus {
+    background-color: white;
+    color: black;
+    border: 2px solid green;
+  }
+  .weekdays, .days {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+  }
+  .weekday, .day {
+    text-align: center;
+    font-weight: bold;
+    padding: 10px 0;
+  }
+  .weekday {
+    color: red;
+  }
+</style>
+</head>
+<body>
+
+<div class="current-date" id="currentDate"></div>
+<div class="calendar-container" id="calendarContainer">
+  <div class="date-selector">
+    <div id="leftArrow" class="arrow">&#9664;</div>
+    <select id="daySelector"></select>
+    <select id="monthSelector"></select>
+    <select id="yearSelector"></select>
+    <div id="rightArrow" class="arrow">&#9654;</div>
+  </div>
+  <div class="weekdays" id="weekdays">
+    <div class="weekday">Mo</div>
+    <div class="weekday">Di</div>
+    <div class="weekday">Mi</div>
+    <div class="weekday">Do</div>
+    <div class="weekday">Fr</div>
+    <div class="weekday">Sa</div>
+    <div class="weekday">So</div>
+  </div>
+  <div class="days" id="days">
+    <!-- Dni miesiąca będą dodawane dynamicznie -->
+  </div>
+</div>
+
+<script>
+  let currentMonth = new Date().getMonth();
+  let currentYear = new Date().getFullYear();
+  let selectedDay = new Date().getDate();
+  const today = new Date();
+  const todayDay = today.getDate();
+  const todayMonth = today.getMonth();
+  const todayYear = today.getFullYear();
+  let currentSelector = 'day';  // Domyślny selektor to 'day'
+
+  const holidays = {
+    '1-1': 'Neujahrstag',
+    '1-2': 'Berchtoldstag',
+    '4-10-2023': 'Karfreitag', '3-29-2024': 'Karfreitag', '4-18-2025': 'Karfreitag', '4-3-2026': 'Karfreitag', '3-26-2027': 'Karfreitag', '4-14-2028': 'Karfreitag', '3-30-2029': 'Karfreitag', '4-19-2030': 'Karfreitag', '4-11-2031': 'Karfreitag',
+    '4-17-2023': 'Ostermontag', '4-1-2024': 'Ostermontag', '4-21-2025': 'Ostermontag', '4-6-2026': 'Ostermontag', '3-29-2027': 'Ostermontag', '4-17-2028': 'Ostermontag', '4-2-2029': 'Ostermontag', '4-22-2030': 'Ostermontag', '4-14-2031': 'Ostermontag',
+    '5-1': 'Tag der Arbeit',
+    '5-18-2023': 'Auffahrt', '5-9-2024': 'Auffahrt', '5-29-2025': 'Auffahrt', '5-14-2026': 'Auffahrt', '5-6-2027': 'Auffahrt', '5-25-2028': 'Auffahrt', '5-10-2029': 'Auffahrt', '5-30-2030': 'Auffahrt', '5-22-2031': 'Auffahrt',
+    '8-1': 'Nationalfeiertag Schweiz',
+    '5-29-2023': 'Pfingstmontag', '5-20-2024': 'Pfingstmontag', '6-9-2025': 'Pfingstmontag', '5-25-2026': 'Pfingstmontag', '5-17-2027': 'Pfingstmontag', '6-5-2028': 'Pfingstmontag', '5-21-2029': 'Pfingstmontag', '6-10-2030': 'Pfingstmontag', '6-2-2031': 'Pfingstmontag',
+    '12-25': 'Weihnachtstag',
+    '12-26': 'Stephanstag'
+  };
+
+  const ferien = [
+    { start: '2023-08-20', end: '2023-08-21', name: 'Beginn Schuljahr' },
+    { start: '2023-10-08', end: '2023-10-21', name: 'Herbstferien' },
+    { start: '2023-12-24', end: '2024-01-06', name: 'Weihnachtsferien' },
+    { start: '2024-02-11', end: '2024-02-24', name: 'Sportferien' },
+    { start: '2024-02-26', name: 'Beginn Frühlingssemester' },
+    { start: '2024-02-18', end: '2024-02-19', name: 'Fasnacht (Stadt Winterthur)' },
+    { start: '2024-03-28', end: '2024-04-01', name: 'Ostern' },
+    { start: '2024-04-21', end: '2024-05-04', name: 'Frühlingsferien' },
+    { start: '2024-04-14', end: '2024-04-15', name: 'Sechseläuten (Stadt Zürich)' },
+    { start: '2024-05-08', end: '2024-05-11', name: 'Auffahrtsbrücke' },
+    { start: '2024-05-17', end: '2024-05-20', name: 'Pfingsten' },
+    { start: '2024-07-14', end: '2024-08-17', name: 'Sommerferien' },
+    { start: '2024-08-18', end: '2024-08-19', name: 'Beginn Schuljahr' },
+    { start: '2024-10-06', end: '2024-10-19', name: 'Herbstferien' },
+    { start: '2024-12-22', end: '2025-01-04', name: 'Weihnachtsferien' },
+    { start: '2025-02-09', end: '2025-02-22', name: 'Sportferien' },
+    { start: '2025-02-23', end: '2025-02-24', name: 'Beginn Frühlingssemester' },
+    { start: '2025-03-09', end: '2025-03-10', name: 'Fasnacht (Stadt Winterthur)' },
+    { start: '2025-04-17', end: '2025-04-21', name: 'Ostern' },
+    { start: '2025-04-20', end: '2025-05-03', name: 'Frühlingsferien' },
+    { start: '2025-04-27', end: '2025-04-28', name: 'Sechseläuten (Stadt Zürich)' },
+    { start: '2025-05-28', end: '2025-05-31', name: 'Auffahrtsbrücke' },
+    { start: '2025-06-06', end: '2025-06-09', name: 'Pfingsten' },
+    { start: '2025-07-13', end: '2025-08-16', name: 'Sommerferien' },
+    { start: '2025-08-17', end: '2025-08-18', name: 'Beginn Schuljahr' },
+    { start: '2025-10-05', end: '2025-10-18', name: 'Herbstferien' },
+    { start: '2025-12-21', end: '2026-01-03', name: 'Weihnachtsferien' },
+    { start: '2026-02-08', end: '2026-02-21', name: 'Sportferien' },
+    { start: '2026-02-22', end: '2026-02-23', name: 'Beginn Frühlingssemester' },
+    { start: '2026-04-02', end: '2026-04-06', name: 'Ostern' },
+    { start: '2026-04-19', end: '2026-05-02', name: 'Frühlingsferien' },
+    { start: '2026-04-19', end: '2026-04-20', name: 'Sechseläuten (Stadt Zürich)' },
+    { start: '2026-05-13', end: '2026-05-16', name: 'Auffahrtsbrücke' },
+    { start: '2026-05-22', end: '2026-05-25', name: 'Pfingsten' },
+    { start: '2026-07-12', end: '2026-08-15', name: 'Sommerferien' },
+    { start: '2026-08-16', end: '2026-08-17', name: 'Beginn Schuljahr' },
+    { start: '2026-10-04', end: '2026-10-17', name: 'Herbstferien' },
+    { start: '2026-12-20', end: '2027-01-02', name: 'Weihnachtsferien' },
+    { start: '2027-02-14', end: '2027-02-27', name: 'Sportferien' },
+    { start: '2027-02-28', end: '2027-03-01', name: 'Beginn Frühlingssemester' },
+    { start: '2027-02-14', end: '2027-02-15', name: 'Fasnacht (Stadt Winterthur)' },
+    { start: '2027-03-25', end: '2027-03-29', name: 'Ostern' },
+    { start: '2027-04-25', end: '2027-05-08', name: 'Frühlingsferien' },
+    { start: '2027-04-18', end: '2027-04-19', name: 'Sechseläuten (Stadt Zürich)' },
+    { start: '2027-05-05', end: '2027-05-08', name: 'Auffahrtsbrücke' },
+    { start: '2027-05-14', end: '2027-05-17', name: 'Pfingsten' },
+    { start: '2027-07-18', end: '2027-08-21', name: 'Sommerferien' },
+    { start: '2027-08-22', end: '2027-08-23', name: 'Beginn Schuljahr' },
+    { start: '2027-10-10', end: '2027-10-23', name: 'Herbstferien' },
+    { start: '2027-12-19', end: '2028-01-01', name: 'Weihnachtsferien' },
+    { start: '2028-02-13', end: '2028-02-26', name: 'Sportferien' },
+    { start: '2028-02-27', end: '2028-02-28', name: 'Beginn Frühlingssemester' },
+    { start: '2028-03-05', end: '2028-03-06', name: 'Fasnacht (Stadt Winterthur)' },
+    { start: '2028-04-13', end: '2028-04-17', name: 'Ostern' },
+    { start: '2028-04-16', end: '2028-04-29', name: 'Frühlingsferien' },
+    { start: '2028-04-23', end: '2028-04-24', name: 'Sechseläuten (Stadt Zürich)' },
+    { start: '2028-05-24', end: '2028-05-27', name: 'Auffahrtsbrücke' },
+    { start: '2028-06-02', end: '2028-06-05', name: 'Pfingsten' },
+    { start: '2028-07-16', end: '2028-08-19', name: 'Sommerferien' },
+    { start: '2028-08-20', end: '2028-08-21', name: 'Beginn Schuljahr' },
+    { start: '2028-10-08', end: '2028-10-21', name: 'Herbstferien' },
+    { start: '2028-12-24', end: '2029-01-06', name: 'Weihnachtsferien' },
+    { start: '2029-02-11', end: '2029-02-24', name: 'Sportferien' },
+    { start: '2029-02-25', end: '2029-02-26', name: 'Beginn Frühlingssemester' },
+    { start: '2029-02-18', end: '2029-02-19', name: 'Fasnacht (Stadt Winterthur)' },
+    { start: '2029-03-29', end: '2029-04-02', name: 'Ostern' },
+    { start: '2029-04-22', end: '2029-05-05', name: 'Frühlingsferien' },
+    { start: '2029-04-15', end: '2029-04-16', name: 'Sechseläuten (Stadt Zürich)' },
+    { start: '2029-05-09', end: '2029-05-12', name: 'Auffahrtsbrücke' },
+    { start: '2029-05-18', end: '2029-05-21', name: 'Pfingsten' },
+    { start: '2029-07-15', end: '2029-08-18', name: 'Sommerferien' },
+    { start: '2029-08-19', end: '2029-08-20', name: 'Beginn Schuljahr' },
+    { start: '2029-10-07', end: '2029-10-20', name: 'Herbstferien' },
+    { start: '2029-12-23', end: '2030-01-05', name: 'Weihnachtsferien' },
+    { start: '2030-02-10', end: '2030-02-23', name: 'Sportferien' },
+    { start: '2030-02-24', end: '2030-02-25', name: 'Beginn Frühlingssemester' },
+    { start: '2030-03-10', end: '2030-03-11', name: 'Fasnacht (Stadt Winterthur)' },
+    { start: '2030-04-18', end: '2030-04-22', name: 'Ostern' },
+    { start: '2030-04-21', end: '2030-05-04', name: 'Frühlingsferien' },
+    { start: '2030-04-07', end: '2030-04-08', name: 'Sechseläuten (Stadt Zürich)' },
+    { start: '2030-05-29', end: '2030-06-01', name: 'Auffahrtsbrücke' },
+    { start: '2030-06-07', end: '2030-06-10', name: 'Pfingsten' },
+    { start: '2030-07-14', end: '2030-08-17', name: 'Sommerferien' },
+    { start: '2030-08-18', end: '2030-08-19', name: 'Beginn Schuljahr' },
+    { start: '2030-10-06', end: '2030-10-19', name: 'Herbstferien' },
+    { start: '2030-12-22', end: '2031-01-04', name: 'Weihnachtsferien' },
+    { start: '2031-02-09', end: '2031-02-22', name: 'Sportferien' },
+    { start: '2031-02-23', end: '2031-02-24', name: 'Beginn Frühlingssemester' },
+    { start: '2031-03-02', end: '2031-03-03', name: 'Fasnacht (Stadt Winterthur)' },
+    { start: '2031-04-10', end: '2031-04-14', name: 'Ostern' },
+    { start: '2031-04-13', end: '2031-04-26', name: 'Frühlingsferien' },
+    { start: '2031-04-20', end: '2031-04-21', name: 'Sechseläuten (Stadt Zürich)' },
+    { start: '2031-05-21', end: '2031-05-24', name: 'Auffahrtsbrücke' },
+    { start: '2031-05-30', end: '2031-06-02', name: 'Pfingsten' },
+    { start: '2031-07-13', end: '2031-08-16', name: 'Sommerferien' }
+  ];
+
+  function formatDate(date) {
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}.${month}.${year}`;
+  }
+
+  function isHoliday(date) {
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    const year = date.getFullYear();
+    const formattedDate = `${month}-${day}`;
+    const fullDate = `${month}-${day}-${year}`;
+    return holidays[formattedDate] || holidays[fullDate];
+  }
+
+  function isFerie(date) {
+    for (const ferie of ferien) {
+      const startDate = new Date(ferie.start);
+      const endDate = new Date(ferie.end);
+      if (date >= startDate && date <= endDate) {
+        return ferie;
+      }
+    }
+    return null;
+  }
+
+  function daysInMonth(month, year) {
+    return new Date(year, month + 1, 0).getDate();
+  }
+
+  function updateCalendar(month, year) {
+    const daysContainer = document.getElementById('days');
+    daysContainer.innerHTML = ''; // Wyczyść poprzednią zawartość
+
+    populateDaySelector();
+    populateMonthSelector();
+    populateYearSelector();
+
+    const firstDay = new Date(year, month, 1).getDay();
+    const blankDays = firstDay === 0 ? 6 : firstDay - 1; // Ustal ilość pustych komórek przed pierwszym dniem miesiąca
+
+    // Dodanie pustych komórek przed pierwszym dniem miesiąca
+    for (let i = 0; i < blankDays; i++) {
+      const blankDiv = document.createElement('div');
+      blankDiv.classList.add('day');
+      daysContainer.appendChild(blankDiv);
+    }
+
+    for (let day = 1; day <= daysInMonth(month, year); day++) {
+      const dayDiv = document.createElement('div');
+      dayDiv.classList.add('day');
+      dayDiv.textContent = day;
+      dayDiv.onclick = function() { selectDay(day); };
+
+      const currentDate = new Date(year, month, day);
+      const holidayName = isHoliday(currentDate);
+      const ferie = isFerie(currentDate);
+
+      if (holidayName && ferie) {
+        dayDiv.classList.add('holiday');
+        const tooltip = document.createElement('div');
+        tooltip.classList.add('tooltip');
+        tooltip.innerHTML = `<div class="tooltip-content"><div class="date">${formatDate(currentDate)}</div><div class="name">${holidayName}</div></div>`;
+        dayDiv.appendChild(tooltip);
+      } else if (holidayName) {
+        dayDiv.classList.add('holiday');
+        const tooltip = document.createElement('div');
+        tooltip.classList.add('tooltip');
+        tooltip.innerHTML = `<div class="tooltip-content"><div class="date">${formatDate(currentDate)}</div><div class="name">${holidayName}</div></div>`;
+        dayDiv.appendChild(tooltip);
+      } else if (ferie) {
+        if (ferie.name === 'Beginn Schuljahr' || ferie.name === 'Beginn Frühlingssemester') {
+          dayDiv.classList.add('special-day');
+        } else {
+          dayDiv.classList.add('ferie');
+        }
+        const tooltip = document.createElement('div');
+        tooltip.classList.add('tooltip');
+        const startDate = new Date(ferie.start);
+        startDate.setDate(startDate.getDate() + 1); // Dodanie jednego dnia do daty początkowej
+        tooltip.innerHTML = `<div class="tooltip-content"><div class="date">${formatDate(startDate)} - ${formatDate(new Date(ferie.end))}</div><div class="name">${ferie.name}</div></div>`;
+        dayDiv.appendChild(tooltip);
+      }
+
+      daysContainer.appendChild(dayDiv);
+
+      if (day === selectedDay) {
+        dayDiv.classList.add('selected-day-clicked');
+        dayDiv.style.color = 'black'; // Upewnij się, że liczba jest widoczna
+      }
+
+      if (day === todayDay && month === todayMonth && year === todayYear) {
+        dayDiv.classList.add('today');
+        dayDiv.style.color = 'white';
+      }
+    }
+
+    attachSelectorEvents();
+  }
+
+  function populateDaySelector() {
+    const daySelector = document.getElementById('daySelector');
+    const numDays = daysInMonth(currentMonth, currentYear);
+    daySelector.innerHTML = '';
+    for (let i = 1; i <= numDays; i++) {
+      const option = document.createElement('option');
+      option.value = i;
+      option.textContent = i;
+      if (i === selectedDay) option.selected = true;
+      daySelector.appendChild(option);
+    }
+  }
+
+  function populateMonthSelector() {
+    const monthSelector = document.getElementById('monthSelector');
+    monthSelector.innerHTML = '';
+    for (let i = 0; i < 12; i++) {
+      const option = document.createElement('option');
+      option.value = i;
+      option.textContent = new Date(2000, i).toLocaleString('de-DE', { month: 'long' });
+      if (i === currentMonth) option.selected = true;
+      monthSelector.appendChild(option);
+    }
+  }
+
+  function populateYearSelector() {
+    const yearSelector = document.getElementById('yearSelector');
+    yearSelector.innerHTML = '';
+    for (let i = 1900; i <= 2100; i++) {
+      const option = document.createElement('option');
+      option.value = i;
+      option.textContent = i;
+      if (i === currentYear) option.selected = true;
+      yearSelector.appendChild(option);
+    }
+  }
+
+  function selectDay(day) {
+    selectedDay = day;
+    updateCalendar(currentMonth, currentYear);
+  }
+
+  function attachSelectorEvents() {
+    document.getElementById('daySelector').onchange = function() {
+      selectDay(parseInt(this.value));
+    };
+
+    document.getElementById('monthSelector').onchange = function() {
+      currentMonth = parseInt(this.value);
+      selectedDay = Math.min(selectedDay, daysInMonth(currentMonth, currentYear));
+      updateCalendar(currentMonth, currentYear);
+    };
+
+    document.getElementById('yearSelector').onchange = function() {
+      currentYear = parseInt(this.value);
+      selectedDay = Math.min(selectedDay, daysInMonth(currentMonth, currentYear));
+      updateCalendar(currentMonth, currentYear);
+    };
+
+    document.getElementById('leftArrow').onclick = function() {
+      changeDate(-1);
+    };
+
+    document.getElementById('rightArrow').onclick = function() {
+      changeDate(1);
+    };
+
+    document.getElementById('daySelector').onclick = function() {
+      currentSelector = 'day';
+    };
+
+    document.getElementById('monthSelector').onclick = function() {
+      currentSelector = 'month';
+    };
+
+    document.getElementById('yearSelector').onclick = function() {
+      currentSelector = 'year';
+    };
+
+    document.getElementById('currentDate').onclick = function() {
+      goToToday();
+    };
+  }
+
+  function changeDate(direction) {
+    if (currentSelector === 'day') {
+      selectedDay += direction;
+      if (selectedDay < 1) {
+        if (currentMonth === 0) {
+          currentMonth = 11;
+          currentYear--;
+        } else {
+          currentMonth--;
+        }
+        selectedDay = daysInMonth(currentMonth, currentYear);
+      } else if (selectedDay > daysInMonth(currentMonth, currentYear)) {
+        selectedDay = 1;
+        if (currentMonth === 11) {
+          currentMonth = 0;
+          currentYear++;
+        } else {
+          currentMonth++;
+        }
+      }
+    } else if (currentSelector === 'month') {
+      currentMonth += direction;
+      if (currentMonth < 0) {
+        currentMonth = 11;
+        currentYear--;
+      } else if (currentMonth > 11) {
+        currentMonth = 0;
+        currentYear++;
+      }
+      selectedDay = Math.min(selectedDay, daysInMonth(currentMonth, currentYear));
+    } else if (currentSelector === 'year') {
+      currentYear += direction;
+      selectedDay = Math.min(selectedDay, daysInMonth(currentMonth, currentYear));
+    }
+    updateCalendar(currentMonth, currentYear);
+  }
+
+  function goToToday() {
+    currentYear = todayYear;
+    currentMonth = todayMonth;
+    selectedDay = todayDay;
+    updateCalendar(currentMonth, currentYear);
+  }
+
+  function updateCurrentDate() {
+    const currentDateDiv = document.getElementById('currentDate');
+    currentDateDiv.textContent = `Heute: ${todayDay}/${todayMonth + 1}/${todayYear}`;
+  }
+
+  updateCurrentDate();
+  updateCalendar(currentMonth, currentYear);
+</script>
+
+</body>
+</html>
